@@ -19,33 +19,46 @@ app.use(express.json());
 // set up static directory
 app.use(express.static(publicDirectoryPath));
 
+// socket.emit - send event to a specific client
+// io.emit - send event to every connected client
+// socket.broadcast - send event to all other clients, except current
+// io.to().emit - emit event to everyone in a specific room
+// socket.broadcast.to().emit - send event to everyone in room except current client
+
 io.on('connection', socket => {
-    socket.emit('renderMessage', generateMessage('Welcome!'));
-    socket.broadcast.emit(
-        'renderMessage',
-        generateMessage('New user has joined')
-    );
+    socket.on('join', ({ username, room }) => {
+        socket.join(room);
+        socket.emit('renderMessage', generateMessage('Welcome!'));
+        socket.broadcast
+            .to(room)
+            .emit(
+                'renderMessage',
+                generateMessage(`${username} has joined the room`)
+            );
+    });
 
     socket.on('sendMessage', (messageToRender, callback) => {
         const filter = new Filter();
         if (filter.isProfane(messageToRender)) {
             return callback('Profanity is not allowed');
         }
-        io.emit('renderMessage', generateMessage(messageToRender));
+        io.to().emit('renderMessage', generateMessage(messageToRender));
         callback();
     });
 
     socket.on('disconnect', () => {
-        io.emit('renderMessage', generateMessage('user has left'));
+        io.to().emit('renderMessage', generateMessage('user has left'));
     });
 
     socket.on('sendLocation', (positionObject, callback) => {
-        socket.emit(
-            'renderLocation',
-            generateLocationMessage(
-                `https://google.com/maps?q=${positionObject.lat},${positionObject.lon}`
-            )
-        );
+        socket
+            .to()
+            .emit(
+                'renderLocation',
+                generateLocationMessage(
+                    `https://google.com/maps?q=${positionObject.lat},${positionObject.lon}`
+                )
+            );
         callback();
     });
 });
